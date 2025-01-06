@@ -16,6 +16,7 @@ function Chart({ data }: ChartProps) {
   const [selectedX, setSelectedX] = useState<number>(0);
   const [selectedY, setSelectedY] = useState<number>(0);
   const [percentage, setPercentage] = useState<number>(10);
+  const [highlightUpdate, setHighlightUpdate] = useState<number>(0);
 
   const calculateMean = (values: number[]): number => {
     return values.reduce((sum, val) => sum + val, 0) / values.length;
@@ -74,6 +75,7 @@ function Chart({ data }: ChartProps) {
     setSelectedX(x);
     setSelectedY(y);
     setPercentage(pct);
+    setHighlightUpdate((prev) => prev + 1);
   };
 
   useEffect(() => {
@@ -119,33 +121,37 @@ function Chart({ data }: ChartProps) {
     const yValues = data.map((d) => d.y);
     const covarianceMatrix = calculateCovariance(xValues, yValues);
 
-    // Calculate Mahalanobis distances for all points
-    const referencePoint = { x: selectedX, y: selectedY };
-    const distances = data.map((point) => ({
-      point,
-      distance: calculateMahalanobisDistance(
-        point,
-        referencePoint,
-        covarianceMatrix
-      ),
-    }));
-
-    // Sort distances and determine threshold for highlighting
-    const sortedDistances = [...distances].sort(
-      (a, b) => a.distance - b.distance
-    );
-    const thresholdIndex = Math.floor(data.length * (percentage / 100));
-    const threshold = sortedDistances[thresholdIndex]?.distance ?? Infinity;
-
-    // Add dots with conditional coloring
-    g.selectAll("circle")
+    // Add dots with basic color
+    const dots = g
+      .selectAll("circle")
       .data(data)
       .enter()
       .append("circle")
       .attr("cx", (d) => xScale(d.x))
       .attr("cy", (d) => yScale(d.y))
       .attr("r", 3)
-      .attr("fill", (d) => {
+      .attr("fill", "steelblue");
+
+    // Only calculate and apply highlighting if highlightUpdate has changed
+    if (highlightUpdate > 0) {
+      const referencePoint = { x: selectedX, y: selectedY };
+      const distances = data.map((point) => ({
+        point,
+        distance: calculateMahalanobisDistance(
+          point,
+          referencePoint,
+          covarianceMatrix
+        ),
+      }));
+
+      const sortedDistances = [...distances].sort(
+        (a, b) => a.distance - b.distance
+      );
+      const thresholdIndex = Math.floor(data.length * (percentage / 100));
+      const threshold = sortedDistances[thresholdIndex]?.distance ?? Infinity;
+
+      // Update dot colors based on distances
+      dots.attr("fill", (d) => {
         const distance = calculateMahalanobisDistance(
           d,
           referencePoint,
@@ -153,6 +159,7 @@ function Chart({ data }: ChartProps) {
         );
         return distance <= threshold ? "red" : "steelblue";
       });
+    }
 
     // Add axis labels
     g.append("text")
@@ -167,7 +174,7 @@ function Chart({ data }: ChartProps) {
       .attr("y", -35)
       .attr("text-anchor", "middle")
       .text("Y Axis");
-  }, [data, selectedX, selectedY, percentage, calculateCovariance]);
+  }, [data, highlightUpdate]); // Only depend on data and highlightUpdate
 
   return (
     <div className="w-full px-4">
@@ -224,13 +231,13 @@ function Chart({ data }: ChartProps) {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
+            <button
+              type="submit"
+              className="flex-1 w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              Update
+            </button>
           </div>
-          <button
-            type="submit"
-            className="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            Submit
-          </button>
         </form>
         <div className="w-full">
           <svg
