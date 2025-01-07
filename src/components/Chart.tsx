@@ -1,36 +1,141 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import * as d3 from "d3";
 import { multiply, subtract, transpose, inv } from "mathjs";
 
 export type DataPoint = number[];
 
+export type SamplingMethod = "random" | "systematic" | "cluster";
+
 type ChartProps = {
   data: DataPoint[];
   selectedPoint: number[];
   percentage: number;
+  subsampleSize?: number;
+  samplingMethod?: SamplingMethod;
+  onPerformanceData?: (data: PerformanceData) => void;
 };
 
-function Chart({ data, selectedPoint, percentage }: ChartProps) {
+type PerformanceData = {
+  samplingTime: number;
+  covarianceTime: number;
+  totalPoints: number;
+  sampledPoints: number;
+  method: SamplingMethod | "full";
+};
+
+function Chart({
+  data,
+  selectedPoint,
+  percentage,
+  subsampleSize,
+  samplingMethod = "random",
+  onPerformanceData,
+}: ChartProps) {
   const DIMS = data[0].length;
   const svgRef = useRef<SVGSVGElement | null>(null);
 
+  const getSubsampledData = useCallback(
+    (data: DataPoint[], size: number, method: SamplingMethod) => {
+      if (!size || size >= data.length) return data;
+
+      const startTime = performance.now();
+      let result: DataPoint[];
+
+      switch (method) {
+        case "random":
+          // Random sampling (existing method)
+          result = [...data].sort(() => Math.random() - 0.5).slice(0, size);
+          break;
+
+        case "systematic":
+          // Systematic sampling (every nth element)
+          const step = Math.floor(data.length / size);
+          result = data.filter((_, index) => index % step === 0).slice(0, size);
+          break;
+
+        case "cluster":
+          // Simple k-means like clustering
+          const k = Math.min(10, Math.floor(size / 50)); // Number of clusters
+          const centers: DataPoint[] = data.slice(0, k); // Initial centers
+
+          // Assign points to nearest center
+          const clusters: DataPoint[][] = Array(k)
+            .fill(null)
+            .map(() => []);
+          data.forEach((point) => {
+            let minDist = Infinity;
+            let nearestCenter = 0;
+
+            centers.forEach((center, i) => {
+              const dist = point.reduce(
+                (sum, val, i) => sum + Math.pow(val - center[i], 2),
+                0
+              );
+              if (dist < minDist) {
+                minDist = dist;
+                nearestCenter = i;
+              }
+            });
+
+            clusters[nearestCenter].push(point);
+          });
+
+          // Take proportional samples from each cluster
+          result = clusters.flatMap((cluster) => {
+            const clusterSize = Math.floor(
+              (cluster.length / data.length) * size
+            );
+            return cluster
+              .sort(() => Math.random() - 0.5)
+              .slice(0, clusterSize);
+          });
+          break;
+
+        default:
+          result = data;
+      }
+
+      const endTime = performance.now();
+
+      if (onPerformanceData) {
+        onPerformanceData({
+          samplingTime: endTime - startTime,
+          covarianceTime: 0, // Will be updated in calculateCovariance
+          totalPoints: data.length,
+          sampledPoints: result.length,
+          method: method,
+        });
+      }
+
+      return result;
+    },
+    [onPerformanceData]
+  );
+
   const calculateCovariance = useCallback(
     (data: number[][]) => {
+      const startTime = performance.now();
+
+      // Use subsampled data for covariance calculation if specified
+      const dataForCovariance = subsampleSize
+        ? getSubsampledData(data, subsampleSize, samplingMethod)
+        : data;
+
       // Calculate means for each dimension
       const means = Array(DIMS).fill(0);
-      for (const point of data) {
+      for (const point of dataForCovariance) {
         for (let i = 0; i < DIMS; i++) {
           means[i] += point[i];
         }
       }
-      means.forEach((_, i) => (means[i] /= data.length));
+      means.forEach((_, i) => (means[i] /= dataForCovariance.length));
 
       // Calculate covariance matrix
       const covMatrix = Array(DIMS)
         .fill(0)
         .map(() => Array(DIMS).fill(0));
 
-      for (const point of data) {
+      for (const point of dataForCovariance) {
         for (let i = 0; i < DIMS; i++) {
           for (let j = 0; j < DIMS; j++) {
             covMatrix[i][j] += (point[i] - means[i]) * (point[j] - means[j]);
@@ -41,13 +146,25 @@ function Chart({ data, selectedPoint, percentage }: ChartProps) {
       // Divide by n-1 for sample covariance
       for (let i = 0; i < DIMS; i++) {
         for (let j = 0; j < DIMS; j++) {
-          covMatrix[i][j] /= data.length - 1;
+          covMatrix[i][j] /= dataForCovariance.length - 1;
         }
+      }
+
+      const endTime = performance.now();
+
+      if (onPerformanceData) {
+        onPerformanceData({
+          samplingTime: 0, // Already reported in getSubsampledData
+          covarianceTime: endTime - startTime,
+          totalPoints: data.length,
+          sampledPoints: dataForCovariance.length,
+          method: subsampleSize ? samplingMethod : "full",
+        });
       }
 
       return covMatrix;
     },
-    [DIMS]
+    [DIMS, subsampleSize, samplingMethod, getSubsampledData, onPerformanceData]
   );
 
   const calculateMahalanobisDistance = (

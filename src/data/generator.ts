@@ -130,10 +130,10 @@ const generateTorus = (numPoints: number = 1000): number[][] => {
 // Generate and save all datasets
 const generateAndSaveDatasets = () => {
   const datasets = {
-    line: generateLine(),
-    sphere: generateSphere(),
-    "multiple-spheres": generateMultipleSpheres(),
-    torus: generateTorus(),
+    line: generateLine(100000),
+    sphere: generateSphere(100000),
+    "multiple-spheres": generateMultipleSpheres(100000),
+    torus: generateTorus(100000),
   };
 
   for (const [name, data] of Object.entries(datasets)) {
