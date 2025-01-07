@@ -120,6 +120,28 @@ function Chart({
           .attr("r", 3)
           .attr("fill", "steelblue");
 
+        // Add cross at selected point
+        if (selectedPoint) {
+          const crossSize = 10;
+          // Vertical line
+          g.append("line")
+            .attr("x1", xScale(selectedPoint[0]))
+            .attr("y1", yScale(selectedPoint[1]) - crossSize)
+            .attr("x2", xScale(selectedPoint[0]))
+            .attr("y2", yScale(selectedPoint[1]) + crossSize)
+            .attr("stroke", "black")
+            .attr("stroke-width", 2);
+
+          // Horizontal line
+          g.append("line")
+            .attr("x1", xScale(selectedPoint[0]) - crossSize)
+            .attr("y1", yScale(selectedPoint[1]))
+            .attr("x2", xScale(selectedPoint[0]) + crossSize)
+            .attr("y2", yScale(selectedPoint[1]))
+            .attr("stroke", "black")
+            .attr("stroke-width", 2);
+        }
+
         // Calculate distances and update colors
         const distances = data.map((point) => ({
           point,
