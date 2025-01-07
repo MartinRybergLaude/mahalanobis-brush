@@ -66,6 +66,7 @@ function Chart({ data, selectedPoint, percentage }: ChartProps) {
 
   useEffect(() => {
     if (!svgRef.current || !data || data.length === 0) return;
+    console.log("rerendered data");
 
     // Clear any existing elements
     d3.select(svgRef.current).selectAll("*").remove();

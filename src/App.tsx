@@ -10,6 +10,7 @@ function App() {
   const [selectedX, setSelectedX] = useState<number>(50);
   const [selectedY, setSelectedY] = useState<number>(50);
   const [percentage, setPercentage] = useState<number>(60);
+  const [dimensions, setDimensions] = useState<number>(2);
 
   const datasets = {
     line: (linedata as DataPoint[]).slice(0, 5000),
@@ -21,6 +22,11 @@ function App() {
   const [selectedDataset, setSelectedDataset] =
     useState<keyof typeof datasets>("line");
 
+  const dataset = datasets[selectedDataset];
+
+  // Chop away the dimensions of the dataset to the selected number of dimensions
+  const reducedDataset = dataset.map((point) => point.slice(0, dimensions));
+
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -28,12 +34,28 @@ function App() {
     setSelectedX(Number(formData.get("x")));
     setSelectedY(Number(formData.get("y")));
     setPercentage(Number(formData.get("percentage")));
+    setDimensions(Number(formData.get("dimensions")));
   };
 
   return (
     <div className="container mx-auto p-4">
       <form ref={formRef} onSubmit={handleSubmit} className="mb-6 space-y-4">
         <div className="flex gap-4">
+          <div className="flex-1">
+            <label
+              htmlFor="dims"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Dimensions
+            </label>
+            <input
+              type="number"
+              id="dims"
+              name="dimensions"
+              defaultValue={dimensions}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
           <div className="flex-1">
             <label
               htmlFor="dataset"
@@ -112,8 +134,8 @@ function App() {
       </form>
 
       <Chart
-        data={datasets[selectedDataset]}
-        selectedPoint={[selectedX, selectedY, 0, 0, 0, 0, 0, 0, 0, 0]}
+        data={reducedDataset}
+        selectedPoint={[selectedX, selectedY, ...Array(dimensions - 2).fill(0)]}
         percentage={percentage}
       />
     </div>
