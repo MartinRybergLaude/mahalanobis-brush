@@ -9,26 +9,71 @@ const addNoise = (value: number, noiseFactor: number = 0.1): number => {
 
 // Utility function to generate random outliers
 const generateOutlier = (): number[] => {
-  return Array(10)
-    .fill(0)
-    .map(() => Math.random() * 100);
+  const outlierType = Math.random();
+  const baseValue = Math.random() * 100;
+
+  if (outlierType < 0.2) {
+    // Type 1: Completely random points across all dimensions (20% of outliers)
+    return Array(10)
+      .fill(0)
+      .map(() => Math.random() * 100);
+  } else if (outlierType < 0.6) {
+    // Type 2: Edge scatter (40% of outliers)
+    return Array(10)
+      .fill(0)
+      .map(() => {
+        // Bias towards edges (0-10 or 90-100)
+        return Math.random() < 0.5
+          ? Math.random() * 10 // 0-10
+          : 90 + Math.random() * 10; // 90-100
+      });
+  } else {
+    // Type 3: Extreme dimension deviations (40% of outliers)
+    const deviatingDims = Array(10)
+      .fill(false)
+      .map(() => Math.random() < 0.5); // 50% chance per dimension to deviate
+
+    return Array(10)
+      .fill(0)
+      .map((_, i) => {
+        if (deviatingDims[i]) {
+          // Extreme values at edges
+          return Math.random() < 0.5
+            ? Math.random() * 5 // 0-5
+            : 95 + Math.random() * 5; // 95-100
+        }
+        // Non-deviating dimensions stay within bounds
+        return Math.max(0, Math.min(100, addNoise(baseValue, 1.0)));
+      });
+  }
 };
 
 // Generate a noisy line (x=y in all dimensions)
 const generateLine = (numPoints: number = 1000): number[][] => {
   const points: number[][] = [];
 
-  for (let i = 0; i < numPoints; i++) {
-    const baseValue = (i / numPoints) * 100;
-    // All dimensions will follow x=y with small noise
+  // Generate the main line points with moderate noise (97.8% of points)
+  const mainLinePoints = Math.floor(numPoints * 0.978);
+  for (let i = 0; i < mainLinePoints; i++) {
+    const baseValue = (i / mainLinePoints) * 100;
     const point = Array(10)
       .fill(0)
-      .map(() => addNoise(baseValue, 0.1));
+      .map(() => addNoise(baseValue, 0.08));
     points.push(point);
   }
 
-  // Add outliers (5% of total points)
-  const numOutliers = Math.floor(numPoints * 0.05);
+  // Add pure random points (0.2% of total)
+  const numRandomPoints = Math.floor(numPoints * 0.002);
+  for (let i = 0; i < numRandomPoints; i++) {
+    points.push(
+      Array(10)
+        .fill(0)
+        .map(() => Math.random() * 100)
+    );
+  }
+
+  // Add extreme outliers (2% of total points)
+  const numOutliers = Math.floor(numPoints * 0.02);
   for (let i = 0; i < numOutliers; i++) {
     points.push(generateOutlier());
   }
@@ -130,10 +175,10 @@ const generateTorus = (numPoints: number = 1000): number[][] => {
 // Generate and save all datasets
 const generateAndSaveDatasets = () => {
   const datasets = {
-    line: generateLine(100000),
-    sphere: generateSphere(100000),
-    "multiple-spheres": generateMultipleSpheres(100000),
-    torus: generateTorus(100000),
+    line: generateLine(20000),
+    sphere: generateSphere(20000),
+    "multiple-spheres": generateMultipleSpheres(20000),
+    torus: generateTorus(20000),
   };
 
   for (const [name, data] of Object.entries(datasets)) {
