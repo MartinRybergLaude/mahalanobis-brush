@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import { getSubsampledData } from "../utils/getSampledData";
 import { getCovariance } from "../utils/getCovariance";
@@ -7,6 +7,15 @@ import { getMahalanobis } from "../utils/getMahalanobis";
 export type DataPoint = number[];
 
 export type SamplingMethod = "random" | "systematic" | "cluster";
+
+type SavedEntry = {
+  id: number;
+  timestamp: string;
+  performanceData: PerformanceData;
+  selectedCount: number;
+  selectedPointIndices: Set<string>;
+  differenceFromFirst?: number;
+};
 
 type ChartProps = {
   data: DataPoint[];
@@ -39,6 +48,14 @@ function Chart({
 }: ChartProps) {
   const DIMS = data[0].length;
   const svgRef = useRef<SVGSVGElement | null>(null);
+
+  const [savedEntries, setSavedEntries] = useState<SavedEntry[]>([]);
+  const [currentPerformanceData, setCurrentPerformanceData] =
+    useState<PerformanceData | null>(null);
+  const [selectedPointsCount, setSelectedPointsCount] = useState<number>(0);
+  const [currentSelectedIndices, setCurrentSelectedIndices] = useState<
+    Set<string>
+  >(new Set());
 
   useEffect(() => {
     if (!svgRef.current || !data || data.length === 0) return;
@@ -101,13 +118,15 @@ function Chart({
           dims: DIMS,
         });
         const endCov = performance.now();
-        onPerformanceData?.({
+
+        const performanceData: PerformanceData = {
           samplingTime: endSubsample - startSubsample,
           covarianceTime: endCov - startCov,
           totalPoints: data.length,
           sampledPoints: subsampledData.length,
           method: samplingMethod,
-        });
+        };
+        onPerformanceData?.(performanceData);
 
         // Add dots
         const dots = g
@@ -159,14 +178,28 @@ function Chart({
         const threshold = sortedDistances[thresholdIndex]?.distance ?? Infinity;
 
         // Update dot colors
+        let selectedCount = 0;
+        const selectedIndices = new Set<string>();
+
         dots.attr("fill", (d) => {
           const distance = getMahalanobis({
             point1: d,
             point2: selectedPoint,
             covMatrix,
           });
-          return distance <= threshold ? "red" : "steelblue";
+          const isSelected = distance <= threshold;
+          if (isSelected) {
+            selectedCount++;
+            // Store the point as a string for comparison
+            selectedIndices.add(JSON.stringify(d));
+          }
+          return isSelected ? "red" : "steelblue";
         });
+
+        // Update the state with selected indices
+        setSelectedPointsCount(selectedCount);
+        setCurrentPerformanceData(performanceData);
+        setCurrentSelectedIndices(selectedIndices);
 
         // Add axis labels
         g.append("text")
@@ -196,7 +229,63 @@ function Chart({
     samplingMethod,
     subsampleSize,
     DIMS,
+    onPerformanceData,
   ]);
+
+  // Add save handler
+  const handleSave = () => {
+    if (!currentPerformanceData) return;
+
+    const newEntry: SavedEntry = {
+      id: Date.now(),
+      timestamp: new Date().toLocaleTimeString(),
+      performanceData: currentPerformanceData,
+      selectedCount: selectedPointsCount,
+      selectedPointIndices: currentSelectedIndices,
+    };
+
+    setSavedEntries((prev) => {
+      const updated = [...prev, newEntry];
+
+      // Calculate difference from first entry for all entries
+      if (updated.length > 1) {
+        const firstEntry = updated[0];
+
+        updated.forEach((entry) => {
+          if (entry === firstEntry) {
+            entry.differenceFromFirst = 0;
+          } else {
+            // Calculate symmetric difference (points that are in one set but not both)
+            let differentPoints = 0;
+
+            // Check points selected in current entry but not in first
+            entry.selectedPointIndices.forEach((point) => {
+              if (!firstEntry.selectedPointIndices.has(point)) {
+                differentPoints++;
+              }
+            });
+
+            // Check points selected in first entry but not in current
+            firstEntry.selectedPointIndices.forEach((point) => {
+              if (!entry.selectedPointIndices.has(point)) {
+                differentPoints++;
+              }
+            });
+
+            // Calculate percentage of different points relative to total selected points
+            const totalUniquePoints = new Set([
+              ...Array.from(entry.selectedPointIndices),
+              ...Array.from(firstEntry.selectedPointIndices),
+            ]).size;
+
+            entry.differenceFromFirst =
+              (differentPoints / totalUniquePoints) * 100;
+          }
+        });
+      }
+      return updated;
+    });
+  };
 
   return (
     <div className="w-full px-4">
@@ -208,6 +297,60 @@ function Chart({
             style={{ minHeight: "400px" }}
           ></svg>
         </div>
+
+        {/* Add save button */}
+        <div className="mt-4 mb-6">
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Save Current State
+          </button>
+        </div>
+
+        {/* Add results table */}
+        {savedEntries.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse border border-gray-300">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="border p-2">Time</th>
+                  <th className="border p-2">Method</th>
+                  <th className="border p-2">Total Points</th>
+                  <th className="border p-2">Sampled Points</th>
+                  <th className="border p-2">Covariance Time (ms)</th>
+                  <th className="border p-2">Selected Points</th>
+                  <th className="border p-2">Diff from First (%)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {savedEntries.map((entry) => (
+                  <tr key={entry.id}>
+                    <td className="border p-2">{entry.timestamp}</td>
+                    <td className="border p-2">
+                      {entry.performanceData.method}
+                    </td>
+                    <td className="border p-2">
+                      {entry.performanceData.totalPoints}
+                    </td>
+                    <td className="border p-2">
+                      {entry.performanceData.sampledPoints}
+                    </td>
+                    <td className="border p-2">
+                      {entry.performanceData.covarianceTime.toFixed(2)}
+                    </td>
+                    <td className="border p-2">{entry.selectedCount}</td>
+                    <td className="border p-2">
+                      {entry.differenceFromFirst !== undefined
+                        ? `${entry.differenceFromFirst.toFixed(1)}%`
+                        : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

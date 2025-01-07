@@ -19,9 +19,7 @@ function App() {
   const [selectedY, setSelectedY] = useState<number>(50);
   const [percentage, setPercentage] = useState<number>(60);
   const [dimensions, setDimensions] = useState<number>(2);
-  const [subsampleSize, setSubsampleSize] = useState<number | undefined>(
-    undefined
-  );
+  const [subsampleSize, setSubsampleSize] = useState<number | undefined>(200);
   const [showSubsampleControls, setShowSubsampleControls] = useState(false);
   const [samplingMethod, setSamplingMethod] = useState<
     "random" | "systematic" | "cluster"
