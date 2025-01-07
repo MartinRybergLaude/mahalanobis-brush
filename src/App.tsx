@@ -249,9 +249,9 @@ function App() {
               <h4 className="font-semibold">Performance Metrics:</h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p>
+                  {/* <p>
                     Sampling Time: {performanceData.samplingTime.toFixed(2)}ms
-                  </p>
+                  </p> */}
                   <p>
                     Covariance Time: {performanceData.covarianceTime.toFixed(2)}
                     ms
@@ -261,7 +261,13 @@ function App() {
                   <p>Method: {performanceData.method}</p>
                   <p>
                     Sample Size: {performanceData.sampledPoints}/
-                    {performanceData.totalPoints} points
+                    {performanceData.totalPoints} points (
+                    {Math.round(
+                      (performanceData.sampledPoints /
+                        performanceData.totalPoints) *
+                        100
+                    )}
+                    %)
                   </p>
                 </div>
               </div>

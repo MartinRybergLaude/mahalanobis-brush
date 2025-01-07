@@ -84,7 +84,7 @@ function Chart({
 
         g.append("g").call(d3.axisLeft(yScale));
 
-        // Calculate covariance matrix for all dimensions
+        const startSubsample = performance.now();
         const subsampledData = doSubsample
           ? await getSubsampledData({
               data,
@@ -92,9 +92,21 @@ function Chart({
               method: samplingMethod,
             })
           : data;
+        const endSubsample = performance.now();
+
+        // Calculate covariance matrix for all dimensions
+        const startCov = performance.now();
         const covMatrix = await getCovariance({
           data: subsampledData,
           dims: DIMS,
+        });
+        const endCov = performance.now();
+        onPerformanceData?.({
+          samplingTime: endSubsample - startSubsample,
+          covarianceTime: endCov - startCov,
+          totalPoints: data.length,
+          sampledPoints: subsampledData.length,
+          method: samplingMethod,
         });
 
         // Add dots

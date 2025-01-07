@@ -23,7 +23,11 @@ export async function getSubsampledData({
   switch (method) {
     case "random":
       // Random sampling (existing method)
-      result = [...data].sort(() => Math.random() - 0.5).slice(0, size);
+      // Reservoir sampling algorithm - O(n) time complexity
+      result = Array.from(
+        { length: size },
+        () => data[Math.floor(Math.random() * data.length)]
+      );
       break;
 
     case "systematic":
