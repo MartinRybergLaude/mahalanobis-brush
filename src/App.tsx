@@ -1,9 +1,9 @@
 import { useRef, FormEvent, useState } from "react";
 import Chart, { DataPoint } from "./components/Chart";
 import linedata from "./data/line.json";
-import scurvedata from "./data/scurve.json";
-import clusterdata from "./data/cluster.json";
-import donutdata from "./data/donut.json";
+import scurvedata from "./data/multiple-spheres.json";
+import clusterdata from "./data/sphere.json";
+import donutdata from "./data/torus.json";
 
 function App() {
   const formRef = useRef<HTMLFormElement>(null);
@@ -50,9 +50,9 @@ function App() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="line">Line</option>
-              <option value="scurve">S-Curve</option>
-              <option value="cluster">Cluster</option>
-              <option value="donut">Donut</option>
+              <option value="scurve">Clusters</option>
+              <option value="cluster">Sphere</option>
+              <option value="donut">Torus</option>
             </select>
           </div>
           <div className="flex-1">
@@ -113,8 +113,7 @@ function App() {
 
       <Chart
         data={datasets[selectedDataset]}
-        selectedX={selectedX}
-        selectedY={selectedY}
+        selectedPoint={[selectedX, selectedY, 0, 0, 0, 0, 0, 0, 0, 0]}
         percentage={percentage}
       />
     </div>
